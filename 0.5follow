@@ -1,0 +1,139 @@
+const INTERVAL = 0.5 // seconds
+const ACTION = 'FOLLOW' // 'UNFOLLOW', 'FOLLOW'
+
+let running = false
+let pageLoading = false
+
+const usersElements = []
+let actionCount = 0
+
+function activateFollowMode() {
+  const followModeButton = document.querySelector('#fastfollow-bttn')
+  if (!followModeButton) return
+  if (followModeButton.classList.contains('fastfollow-bttnActive')) return
+  followModeButton.click()
+}
+
+function goToNextPage() {
+  const nextPageButton = document.querySelector('#next')
+  if (!nextPageButton) return false
+  console.log('Going to next page')
+  nextPageButton.click()
+  pageLoading = true
+  return true
+}
+
+function addToUserList(userElement) {
+  const followButton = userElement.querySelector('li[id^="follow"]')
+  const isFollowed = followButton?.style?.display === 'none'
+  if (ACTION === 'FOLLOW' && !isFollowed) {
+    usersElements.push(userElement)
+  }
+  if (ACTION === 'UNFOLLOW' && isFollowed) {
+    usersElements.push(userElement)
+  }
+}
+
+function recursiveFollow() {
+  if (!running) {
+    console.log('Stopped')
+    return
+  }
+  if (pageLoading) {
+    console.log('Waiting for page to load')
+    return
+  }
+
+  const userElement = usersElements.shift()
+  if (!userElement) return goToNextPage()
+
+  const followButton = userElement.querySelector('li[id^="follow"]')
+  if (followButton?.style?.display !== 'none') {
+    followButton.click()
+    actionCount += 1
+    console.log(`Followed: ${actionCount}`)
+  }
+  setTimeout(recursiveFollow, INTERVAL * 1000)
+}
+
+function recursiveUnfollow() {
+  if (!running) {
+    console.log('Stopped')
+    return
+  }
+  if (pageLoading) {
+    console.log('Waiting for page to load')
+    return
+  }
+
+  const userElement = usersElements.shift()
+  if (!userElement) return goToNextPage()
+
+  const unfollowButton = userElement.querySelector('li[id^="unfollow"]')
+  if (unfollowButton?.style?.display !== 'none') {
+    unfollowButton.click()
+    actionCount += 1
+    console.log(`Unfollowed: ${actionCount}`)
+  }
+  setTimeout(recursiveUnfollow, INTERVAL * 1000)
+}
+
+function start() {
+  running = true
+  if (ACTION === 'FOLLOW') {
+    recursiveFollow()
+  }
+  if (ACTION === 'UNFOLLOW') {
+    recursiveUnfollow()
+  }
+}
+
+function stop() {
+  running = false
+  console.log('Paused')
+}
+
+function init() {
+  activateFollowMode()
+  if (usersElements.length > 0) return
+  const followableUsrs = document.querySelectorAll('.tuser_wrap')
+  for (let i = 0, len = followableUsrs.length; i < len; i += 1) {
+    addToUserList(followableUsrs[i])
+  }
+  if (!usersElements?.length) {
+    console.log('No users to follow')
+    return
+  }
+  pageLoading = false
+  start()
+}
+
+const onMutationsObserved = mutations => {
+  mutations.forEach(async mutation => {
+    const nodes = mutation.addedNodes
+    for (let i = 0, len = nodes.length; i < len; i += 1) {
+      try {
+        const node = nodes[i]
+        if (!node?.classList?.contains('tuser_wrap')) return
+        // addToUserList(node)
+        // call start after the new page is loaded
+        if (pageLoading) {
+          pageLoading = false
+          setTimeout(() => {
+            init()
+          }, 3000)
+        }
+      } catch (e) {
+        console.log(e)
+      }
+    }
+  })
+}
+
+const observer = new MutationObserver(onMutationsObserved)
+observer.observe(document.body, {
+  subtree: true,
+  childList: true,
+  attributes: true,
+})
+init()
